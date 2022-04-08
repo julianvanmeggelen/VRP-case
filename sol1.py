@@ -4,6 +4,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 from vrpy import VehicleRoutingProblem
+import argparse
+import sys
+import os
+
+
+
+# [1] Assign clients to hubs
+# [2] For each day:
+#   [1] Solve per hub
+#   [2] Determine hub product requirements
+#   [3] Solve for depot
+
+
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
 
 def computeDistanceMatrix(instance: InstanceCO22, roundUp: bool = True) -> np.ndarray:
     # https://stackoverflow.com/questions/22720864/efficiently-calculating-a-euclidean-distance-matrix-using-numpy
@@ -15,7 +34,6 @@ def computeDistanceMatrix(instance: InstanceCO22, roundUp: bool = True) -> np.nd
         out = np.ceil(out)
     return out
 
-
 def assignHub(distanceMatrix: np.ndarray, hubs: list, nDepot: int = 1)-> np.ndarray:
     # Take distance matrix and assign to each point the closest hub 
     # hubs: list of indices containing place of the hubs in the distanceMatrix
@@ -26,7 +44,7 @@ def assignHub(distanceMatrix: np.ndarray, hubs: list, nDepot: int = 1)-> np.ndar
     return assignedHub
 
 def pointsPerHub(assignedHub: np.ndarray) -> np.ndarray:
-    #List of indices per hub
+        #List of indices per hub
     sort_idx = np.argsort(assignedHub)
     a_sorted = assignedHub[sort_idx]
     unq_first = np.concatenate(([True], a_sorted[1:] != a_sorted[:-1]))
@@ -46,6 +64,24 @@ def locationsWithRequest(locations, requests):
     loc_ids = [_.customerLocID for _ in requests]
     return [_ for _ in locations if _.ID in loc_ids]
 
+def amountPerProduct(instance, requests):
+    nProducts = len(instance.Products)
+    res = [None]*nProducts
+    for i in range(nProducts):
+        res[i] = sum([req.amounts[i] for req in requests])
+    return res
+
+def requestsIdForRoute(route, instance, day):
+    #Reverse engineer request ids for given route and day
+    route = route[1:-1] #trim hub
+    res = []
+    requests = filterRequests(instance, day=day)
+    for i, locID in enumerate(route):
+        for req in requests:
+            if req.customerLocID == locID:
+                res.append(req.ID)
+    return res
+
 def toNetworkX_hubschedule(clientLocations, requests, hub=None):
     locations = clientLocations
     locations = locations + [hub]
@@ -56,10 +92,15 @@ def toNetworkX_hubschedule(clientLocations, requests, hub=None):
             G.add_node("Sink")
         else:
             G.add_node(loc.ID)
-
+            
     for req in requests:
         if req in G.nodes.keys():
-            G.nodes[req.customerLocID]['demand'] = sum(req.amounts)
+            G.nodes[req.customerLocID]['demand'] = 0
+
+    for req in requests:
+        print(req.ID, " served")
+        if req in G.nodes.keys():
+            G.nodes[req.customerLocID]['demand'] =  G.nodes[req.customerLocID]['demand'] + sum(req.amounts)
 
     for l1 in locations:
         for l2 in locations:
@@ -134,6 +175,7 @@ def sol1(instance):
             best_routes = prob.best_routes
             best_routes = {'routes':{id:listReplace(best_routes[id], ["Source","Sink"], hub_ID) for id in best_routes.keys()}}
             best_routes['demand'] = sum([sum(req.amounts) for req in requests])
+            best_routes['demandPerProduct'] = amountPerProduct(instance, requests)
             dayRoutes[hub_ID] = best_routes
         hubRoutes[day] = dayRoutes
 
@@ -144,14 +186,73 @@ def sol1(instance):
     for day in range(1,instance.Days+1):
         hubsUsed = hubRoutes[day]
         hubLocations = [instance.Locations[_-1] for _ in hubsUsed.keys()]
-        G, _ = toNetworkX_depotschedule(hubLocations, depotLocation, hubsUsed)
-        prob = VehicleRoutingProblem(G, load_capacity=instance.TruckCapacity)
-        prob.duration = instance.TruckMaxDistance
-        prob.solve()
-        depotRoutes[day] = {id:listReplace(prob.best_routes[id], ["Source","Sink"], depotID) for id in prob.best_routes.keys()}
+        if len(hubLocations) > 0:
+            G, _ = toNetworkX_depotschedule(hubLocations, depotLocation, hubsUsed)
+            prob = VehicleRoutingProblem(G, load_capacity=instance.TruckCapacity)
+            prob.duration = instance.TruckMaxDistance
+            prob.solve()
+            depotRoutes[day] = {id:listReplace(prob.best_routes[id], ["Source","Sink"], depotID) for id in prob.best_routes.keys()}
+        else:
+            depotRoutes[day] = {}
    
-    return {'hubRoutes':hubRoutes, 'deoptRoutes':depotRoutes}
+    return {'hubRoutes':hubRoutes, 'depotRoutes':depotRoutes}
 
 
-def toTxt(sol):
-    return
+def toStr(res, instance):
+    resultString = "DATASET = CO2022_11 \n \n"
+    for day in range(1, instance.Days+1):
+        resultString += f"DAY = {day} \n"
+        nTrucks = len(res['depotRoutes'][day])
+        resultString += f"NUMBER_OF_TRUCKS = {nTrucks} \n"
+
+        truckString = ""
+        for i, truckRoute in res['depotRoutes'][day].items():
+            truckString += f"{i} "
+            for hub in truckRoute[1:-1]:
+                amountPerProduct = res['hubRoutes'][day][hub]['demandPerProduct']
+                truckString += f"H{hub-1} {','.join([str(_) for _ in amountPerProduct])} "
+            truckString += "\n"
+        resultString += truckString
+
+        nVans = 0
+        i = 0
+        vanString = ""
+        for hub in res['hubRoutes'][day].keys():
+            for _, route in res['hubRoutes'][day][hub]['routes'].items():
+                i+=1
+                reqIds = requestsIdForRoute(route, instance, day)
+                vanString += f"{i} H{hub-1} {' '.join([str(_) for _ in reqIds])} \n"
+            nVans += len(res['hubRoutes'][day][hub]['routes'])
+        resultString += f"NUMBER_OF_VANS = {nVans} \n"  
+        resultString += vanString + "\n"
+    return resultString
+    
+def solveAndSave(instance, path, i):
+    blockPrint()
+    try:
+        res = sol1(instance)
+        resStr = toStr(res, instance)
+        with open(path + f"/solution{i}.txt" ,'w') as file:
+            file.write(resStr)
+        print("succes")
+        return path + f"/solution{i}.txt"
+    except Exception as e:
+        print(e)
+
+if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description='Naive algo')
+        parser.add_argument('--instancenr', '-i', metavar='INSTANCE_FILE', required=True, help='The instance file')
+        parser.add_argument('--savedir', '-d', metavar='SAVE_PATH', help='The save location')
+        args = parser.parse_args()
+        instance = loadInstance(int(args.instancenr))
+        solveAndSave(instance, args.savedir, args.instancenr)
+
+
+
+
+
+
+
+
+
+
