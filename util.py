@@ -2,6 +2,14 @@ from curses import KEY_LEFT
 import math
 from validator.InstanceCO22 import InstanceCO22
 import matplotlib.pyplot as plt
+
+def instancePath(instanceNr):
+    base = "./Instances/"
+    folders = ["Instance_1-10/","Instance_11-20/","Instance_21-30/"]
+    folder = folders[math.floor((instanceNr-1)/10)]
+    path = base + folder + f"Instance_{instanceNr}.txt"
+    return path
+
 def loadInstance(instanceNr: int) -> InstanceCO22:
     base = "./Instances/"
     folders = ["Instance_1-10/","Instance_11-20/","Instance_21-30/"]
@@ -19,12 +27,17 @@ def plotInstance(instance):
     plt.scatter(locX[1+nHubs:], locY[1+nHubs:],marker='.')
     plt.legend()
 
-def plotLocations(locations):
-    plt.figure(figsize=(7,7))
+def plotLocations(locations, ax=None):
     locX = [_.X for _ in locations]
     locY = [_.Y for _ in locations]
-    plt.scatter(locX, locY,marker='.')
-    plt.legend()
+    if ax:
+        ax.scatter(locX, locY,marker='.')
+        ax.legend()
+    else:
+        plt.figure(figsize=(7,7))
+        plt.scatter(locX, locY,marker='.')
+        plt.legend()
+
 
 def listReplace(list, keys, value):
     

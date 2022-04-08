@@ -8,11 +8,16 @@
 import os
 import argparse, copy
 import xml.etree.ElementTree as ET
-from InstanceCO22 import InstanceCO22 as InstanceCO22
-import baseParser as base
 from collections import OrderedDict
 from pprint import pprint as pprint
 import sys
+
+try:
+    import baseParser as base
+    from InstanceCO22 import InstanceCO22 as InstanceCO22
+except:
+    import validator.baseParser as base
+    from validator.InstanceCO22 import InstanceCO22 as InstanceCO22
 
 class SolutionCO22(base.BaseParser):
     parsertype = 'solution'

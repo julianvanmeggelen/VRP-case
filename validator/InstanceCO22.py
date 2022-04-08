@@ -6,7 +6,11 @@
 
 import argparse
 import math
-import validator.baseParser as base
+try:
+    import baseParser as base
+except:
+    import validator.baseParser as base
+
 
 class InstanceCO22(base.BaseParser):
     parsertype = 'instance'
