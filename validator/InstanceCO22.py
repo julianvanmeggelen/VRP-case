@@ -66,12 +66,12 @@ class InstanceCO22(base.BaseParser):
                 self.amounts.append(int(kg))
 
         def __repr__(self):
-            result = '{:>5} {:>5} {:>5}'.format(self.ID,self.desiredDay,self.customerLocID)
-            result += f'amounts = '
-            for i in self.kgArray:
+            result = 'Id:{:>2} desiredDay{:>2} customerLocID{:>2}'.format(self.ID,self.desiredDay,self.customerLocID)
+            result += f' amounts = '
+            for i in self.amounts:
                 result += str(i)
                 result += ','
-            return result
+            return result + "\n"
 
     class Location(object):
         def __init__(self,ID,X,Y):
