@@ -58,7 +58,7 @@ class InstanceCO22(base.BaseParser):
             self.daysFresh = daysFresh
 
         def __repr__(self):
-            return '{:>5} {:>5}'.format(self.ID,self.allowedRequests)
+            return '{:>5} {:>5}'.format(self.ID,self.daysFresh)
 
     class Request(object):
         def __init__(self,ID,desiredDay,customerLocID,kgArray):
