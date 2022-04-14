@@ -27,6 +27,18 @@ def plotInstance(instance):
     plt.scatter(locX[1+nHubs:], locY[1+nHubs:],marker='.')
     plt.legend()
 
+def getPlotInstance(instance):
+    fig, ax = plt.subplots()
+    locX = [_.X for _ in instance.Locations]
+    locY = [_.Y for _ in instance.Locations]
+    nHubs = len(instance.Hubs)
+    ax.scatter(locX[0], locY[0], marker=",", label="Depot")
+    ax.scatter(locX[1:1+nHubs], locY[1:1+nHubs],marker="^", label="Hub")
+    ax.scatter(locX[1+nHubs:], locY[1+nHubs:],marker='.')
+    fig.legend()
+    return fig
+
+
 def plotLocations(locations, ax=None):
     locX = [_.X for _ in locations]
     locY = [_.Y for _ in locations]
