@@ -40,9 +40,16 @@ def plotLocations(locations, ax=None):
 
 
 def listReplace(list, keys, value):
-    
     for i, _ in enumerate(list):
         if _ in keys:
             list[i] = value
     return list
+
+
+def amountPerProduct(instance, requests):
+    nProducts = len(instance.Products)
+    res = [None]*nProducts
+    for i in range(nProducts):
+        res[i] = sum([req.amounts[i] for req in requests])
+    return res
     
