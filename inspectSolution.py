@@ -19,16 +19,24 @@ def plotSolution(sol: SolutionCO22, day):
         locY = [instance.Locations[i].Y for i in route.Route]
         locX = [locDepotX] + locX + [locDepotX]
         locY = [locDepotY] + locY + [locDepotY]
-        ax.plot(locX, locY)
+        ax.plot(locX, locY, c="red")
 
-    for route in sol.Days[day-1].VanRoutes:
+    colors = ['b','g','y','b']
+
+    for i, route in enumerate(sol.Days[day-1].VanRoutes):
         locHubX = instance.Locations [route.HubID].X
         locHubY = instance.Locations [route.HubID].Y
         locX = [instance.Locations[instance.Requests[i-1].customerLocID-1].X for i in route.Route]
         locY = [instance.Locations[instance.Requests[i-1].customerLocID-1].Y for i in route.Route]
         locX = [locHubX] + locX + [locHubX]
         locY = [locHubY] + locY + [locHubY]
-        ax.plot(locX, locY)
+        color = colors[i%len(colors)]
+        ax.plot(locX, locY, c=color)
+
+    reqs = [_ for _ in instance.Requests if _.desiredDay is day]
+    locX = [instance.Locations[req.customerLocID-1].X for req in reqs]
+    locY = [instance.Locations[req.customerLocID-1].Y for req in reqs]
+    ax.scatter(locX, locY,marker='.', alpha=1)
 
     locX = [_.X for _ in instance.Locations]
     locY = [_.Y for _ in instance.Locations]
@@ -41,14 +49,17 @@ def plotSolution(sol: SolutionCO22, day):
 
 solutionfile = st.file_uploader("Upload solution")
 if solutionfile:
-    temppath = "tempsol.txt"
-    with open(temppath, "wb") as outfile:
-        # Copy the BytesIO stream to the output file
-        outfile.write(solutionfile.getbuffer())
-    solution = SolutionCO22(temppath, instance, 'txt')
-    day = st.selectbox(label="Day", options = list(range(1,instance.Days+1)))
-    st.pyplot(plotSolution(solution, day))
-    st.write(solution.calcCost.__dict__)
+    try:
+        temppath = "tempsol.txt"
+        with open(temppath, "wb") as outfile:
+            # Copy the BytesIO stream to the output file
+            outfile.write(solutionfile.getbuffer())
+        solution = SolutionCO22(temppath, instance, 'txt')
+        day = st.selectbox(label="Day", options = list(range(1,instance.Days+1)))
+        st.pyplot(plotSolution(solution, day))
+        st.write(solution.calcCost.__dict__)
+    except Exception as e:
+        st.write("Make sure the solution is for the selected instance")
 
 
 
