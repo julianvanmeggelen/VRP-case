@@ -1,5 +1,5 @@
 ## instance solution datamodel
-
+'''
 {'depotRoutes': 
     {day:                                                   for every day in instance days
         {routeID:                                           for every routeID in [1, ... , #routes] for day
@@ -43,4 +43,4 @@
         }
     }
 }
-                                        
+'''                                       
