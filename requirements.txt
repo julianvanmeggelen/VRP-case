@@ -1,0 +1,7 @@
+~==reamlit
+networkx==2.7.1
+seaborn==0.11.0
+numpy==1.19.1
+vrpy==0.5.1
+matplotlib==3.3.0
+streamlit==1.8.1
