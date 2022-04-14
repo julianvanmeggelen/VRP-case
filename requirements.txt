@@ -1,4 +1,3 @@
-~==reamlit
 networkx==2.7.1
 seaborn==0.11.0
 numpy==1.19.1
