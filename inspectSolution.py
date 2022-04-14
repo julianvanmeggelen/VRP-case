@@ -3,6 +3,13 @@ from util import *
 from validator.Validate import SolutionCO22
 import seaborn as sns 
 sns.set()
+
+#
+# Streamlit app to inspect solution file routes
+#
+
+
+
 i = st.selectbox(label="instance nr", options = list(range(1,31)))
 i = int(i)
 if i != 0:
@@ -12,14 +19,6 @@ if i != 0:
 
 def plotSolution(sol: SolutionCO22, day):
     fig, ax = plt.subplots()
-    for route in sol.Days[day-1].TruckRoutes:
-        locDepotX = instance.Locations [0].X
-        locDepotY = instance.Locations [0].Y
-        locX = [instance.Locations[i].X for i in route.Route]
-        locY = [instance.Locations[i].Y for i in route.Route]
-        locX = [locDepotX] + locX + [locDepotX]
-        locY = [locDepotY] + locY + [locDepotY]
-        ax.plot(locX, locY, c="red")
 
     colors = ['b','g','y','b']
 
@@ -32,6 +31,15 @@ def plotSolution(sol: SolutionCO22, day):
         locY = [locHubY] + locY + [locHubY]
         color = colors[i%len(colors)]
         ax.plot(locX, locY, c=color)
+
+    for route in sol.Days[day-1].TruckRoutes:
+        locDepotX = instance.Locations [0].X
+        locDepotY = instance.Locations [0].Y
+        locX = [instance.Locations[i].X for i in route.Route]
+        locY = [instance.Locations[i].Y for i in route.Route]
+        locX = [locDepotX] + locX + [locDepotX]
+        locY = [locDepotY] + locY + [locDepotY]
+        ax.plot(locX, locY, c="red")
 
     reqs = [_ for _ in instance.Requests if _.desiredDay is day]
     locX = [instance.Locations[req.customerLocID-1].X for req in reqs]
