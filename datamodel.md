@@ -6,9 +6,10 @@
             [{                                              for every node on the route
                 'X',
                 'Y',
-                'locID'
+                'locID',
                 'collect',
                 'demand',
+                'amounts',
                 'frequency',
                 'lower',
                 'service_time',
@@ -22,7 +23,7 @@
             {
             'amounts': [4, 9, 0],
             'demand': 13,
-            'routes': 
+            'routes':                                       
                 {routeID:                                   for every routeID in [1, ... , #routes] for hub
                     {'route': 
                         [{                                  for every node on the route
