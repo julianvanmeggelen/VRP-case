@@ -157,8 +157,8 @@ def solve(instance: InstanceCO22) -> dict:
                 dayRoutes[hubLocID] = dayHubRoutes
         hubRoutes[day] = dayRoutes
     depotRoutes = {}
-    for day in range(1, nDays+1):  
-        if len(hubRoutes[day])>0:                                                #depot routing
+    for day in range(1, nDays+1):                                                   #depot routing
+        if len(hubRoutes[day])>0:                                                   
             res = solveDepotVRP(instance, hubRoutes[day])
             depotRoutes[day] = res
         else:
