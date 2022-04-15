@@ -53,6 +53,7 @@ def plotSolution(sol: SolutionCO22, day):
     ax.scatter(locX[1:1+nHubs], locY[1:1+nHubs],marker="^", label="Hub")
     ax.scatter(locX[1+nHubs:], locY[1+nHubs:],marker='.', alpha=0.3)
     fig.legend()
+    #fig.suptitle(f"Instance {i} day {day}")
     return fig
 
 solutionfile = st.file_uploader("Upload solution")
@@ -68,6 +69,7 @@ if solutionfile:
         st.write(solution.calcCost.__dict__)
     except Exception as e:
         st.write("Make sure the solution is for the selected instance")
+        print(e)
 
 
 

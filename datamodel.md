@@ -21,8 +21,8 @@
     {day:                                                   for every day in instance days
         {hubLocID:                                          for every hub active on the day  
             {
-            'amounts': [4, 9, 0],
-            'demand': 13,
+            'amounts',
+            'demand',
             'routes':                                       
                 {routeID:                                   for every routeID in [1, ... , #routes] for hub
                     {'route': 
