@@ -35,11 +35,17 @@ def plotSolution(sol: SolutionCO22, day):
     for route in sol.Days[day-1].TruckRoutes:
         locDepotX = instance.Locations [0].X
         locDepotY = instance.Locations [0].Y
-        locX = [instance.Locations[i].X for i in route.Route]
-        locY = [instance.Locations[i].Y for i in route.Route]
+        hubIDs = route.Route
+        locX = [instance.Locations[i].X for i in hubIDs]
+        locY = [instance.Locations[i].Y for i in hubIDs]
+
+        for i, txt in enumerate(hubIDs):
+            ax.annotate(txt, (locX[i], locY[i]))
+
         locX = [locDepotX] + locX + [locDepotX]
         locY = [locDepotY] + locY + [locDepotY]
         ax.plot(locX, locY, c="red")
+        
 
     reqs = [_ for _ in instance.Requests if _.desiredDay is day]
     locX = [instance.Locations[req.customerLocID-1].X for req in reqs]
