@@ -11,6 +11,7 @@ vrpy = "==0.5.1"
 matplotlib = "==3.3.0"
 streamlit = "==1.8.1"
 typing-extensions = "*"
+pandas = "*"
 
 [dev-packages]
 
