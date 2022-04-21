@@ -15,12 +15,12 @@ logging.basicConfig(level=logging.CRITICAL)
 #   USAGE
 #   python batchSolve.py
 #       -a: algo name must be in algorithms dict below.
-#           Algo name is name of module, which must have method solveAndSave whith signature (instance: InstanceCO22, path: Str, i: int) -> None
+#           Algo name is name of module, which must have method solveAndSave whith signature (instance: InstanceCO22, path: Str, i: int) -> Str (path of saved file)
 #       -i: up untill instance
 #       -d: savedirectory
 ##
 
-algorithms = ['algorithm1_1', 'algorithm1_2']
+algorithms = ['algorithm1_1', 'algorithm1_2', 'algorithm2_greedy02']
 instanceNr = [i for i in range(1, 21)]
 
 

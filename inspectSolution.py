@@ -54,7 +54,9 @@ def plotSolution(sol: SolutionCO22, day):
     ax.scatter(locX[1+nHubs:], locY[1+nHubs:],marker='.', alpha=0.3)
     fig.legend()
     #fig.suptitle(f"Instance {i} day {day}")
+    ax.set_aspect('equal', adjustable='box')
     return fig
+
 
 solutionfile = st.file_uploader("Upload solution")
 if solutionfile:
