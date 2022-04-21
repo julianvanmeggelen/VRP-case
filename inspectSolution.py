@@ -38,9 +38,10 @@ def plotSolution(sol: SolutionCO22, day):
         hubIDs = route.Route
         locX = [instance.Locations[i].X for i in hubIDs]
         locY = [instance.Locations[i].Y for i in hubIDs]
-
-        for i, txt in enumerate(hubIDs):
-            ax.annotate(txt, (locX[i], locY[i]))
+        
+        if loclabels:
+            for i, txt in enumerate(hubIDs):
+                ax.annotate(txt, (locX[i], locY[i]))
 
         locX = [locDepotX] + locX + [locDepotX]
         locY = [locDepotY] + locY + [locDepotY]
@@ -65,6 +66,7 @@ def plotSolution(sol: SolutionCO22, day):
 
 
 solutionfile = st.file_uploader("Upload solution")
+loclabels  = st.checkbox('Show hub locID')
 if solutionfile:
     try:
         temppath = "tempsol.txt"
