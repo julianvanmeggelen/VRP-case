@@ -64,4 +64,6 @@ def amountPerProduct(instance, requests):
     for i in range(nProducts):
         res[i] = sum([req.amounts[i] for req in requests])
     return res
+
+    
     
