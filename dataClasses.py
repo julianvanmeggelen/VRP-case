@@ -41,6 +41,9 @@ class DistanceMatrix(object):
         return self.instance.Requests[reqID-1].customerLocID
 
 class Node(object):
+
+    #node carrying request data
+
     def __init__(self, reqID=None, locID=None, amounts=None, X=None, Y=None, isHub=False):
         # suggest id: requestDI
         self.reqID = reqID
@@ -103,6 +106,10 @@ class HubRoute(object):
 
     def deleteNode(self, node):
         self.nodes.remove(node)
+
+    def deleteNodes(self, nodes: List[Node]):
+        for node in nodes:
+            self.deleteNode(node)
 
     def deleteNodeByReqID(self, reqID):
         indexToDelete = self._findIndexOfID(reqID)
@@ -261,6 +268,23 @@ class DayHubRoutes(object):
             self.routes.remove(r1)
         return self
 
+    def randomSectionInsertion(self):
+        r1 = random.choice(self.routes)     #choose random route r1
+        n = len(r1)
+        sectionBegin = random.randint(0,n-1)
+        sectionEnd = random.randint(sectionBegin,n)
+        section = r1.nodes[sectionBegin:sectionEnd]
+        r1.deleteNodes(section)
+        r2 = random.choice(self.routes)     #choose next random route r2
+        insertBefore = random.randint(0,len(r2)+1)            #choose next random node n2  
+        section.reverse()  
+        for node in section:
+            r2.insertNodeBefore(insertBefore, node)
+        if len(r1) == 0:
+            self.routes.remove(r1)
+        return self
+
+
     def shuffleRoute(self):
         #shuffle two nodes within one route
         r1 = random.choice(self.routes)     #choose random route r1
@@ -275,6 +299,14 @@ class DayHubRoutes(object):
         #print(r1)
         return self
 
+    def randomMergeRoutes(self):
+        # take two routes and paste 1 route to the back of the other
+        if len(self) > 1:
+            r1 = random.choice(self.routes) 
+            self.routes.remove(r1)
+            r2 = random.choice(self.routes)   
+            r2.addNodes(r1.nodes)
+        return self
 
     def randomNodeExchange():
         # Select two nodes and switch position (can be in different routes)
@@ -292,6 +324,7 @@ class DayHubRoutes(object):
 
     def randomSectionExchange():
         # Select two sections from two different routes and exchange sections
+
         raise NotImplementedError
 
 class HubRoutes(object):
@@ -347,4 +380,4 @@ class HubRoutes(object):
         return self.hubRoutes[i]
 
     # operators for neighbourhood exploration
-    
+

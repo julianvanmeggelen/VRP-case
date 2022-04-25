@@ -394,6 +394,7 @@ class SolutionCO22(base.BaseParser):
 
                     #no longer needed: nrOfStops = len(VanRoute.Route)vanDistance = 0
                     vanDistance = 0 #of this route only
+                    vanLoad = 0 ###added this #of this route only
                     lastNode = None
                     for node in VanRoute.Route:
                         if node > 0:
@@ -413,12 +414,14 @@ class SolutionCO22(base.BaseParser):
                             fromCoord = self.Instance.Requests[lastNode-1].customerLocID - 1
                             toCoord = self.Instance.Requests[node-1].customerLocID - 1
                         vanDistance += self.Instance.calcDistance[fromCoord][toCoord]
+                        vanLoad += sum(self.Instance.Requests[node-1].amounts) ####added this
                         lastNode = node
                     #Final part of this van trip:
                     fromCoord = self.Instance.Requests[VanRoute.Route[-1] - 1].customerLocID - 1
                     toCoord = VanRoute.HubID #back to the hub
                     vanDistance += self.Instance.calcDistance[fromCoord][toCoord]
                     self._checkError('Distance traveled by van %d exceeds maximum allowed distance on day %d (%d > %d)' %(VanRoute.ID, day.dayNumber, vanDistance, self.Instance.VanMaxDistance), vanDistance <= self.Instance.VanMaxDistance)
+                    print('ERROR FOUND THAT IS NOT CAPTURED BY VALIDATOR::: Load traveled by van %d exceeds maximum allowed load on day %d (%d > %d)' %(VanRoute.ID, day.dayNumber, vanLoad, self.Instance.VanCapacity)) if vanLoad >= self.Instance.VanCapacity else None
                     vanDistanceToday += vanDistance
                 VanDistancePerDay[day.dayNumber - 1] = vanDistanceToday
 

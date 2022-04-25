@@ -17,7 +17,9 @@ if i != 0:
     fig = getPlotInstance(instance)
     st.pyplot(fig)
 
-def plotSolution(sol: SolutionCO22, day):
+loclabels  = st.checkbox('Show hub locID')
+
+def plotSolution(sol: SolutionCO22, day, loclabels):
     fig, ax = plt.subplots()
 
     colors = ['b','g','y','b']
@@ -66,7 +68,6 @@ def plotSolution(sol: SolutionCO22, day):
 
 
 solutionfile = st.file_uploader("Upload solution")
-loclabels  = st.checkbox('Show hub locID')
 if solutionfile:
     try:
         temppath = "tempsol.txt"
@@ -75,7 +76,7 @@ if solutionfile:
             outfile.write(solutionfile.getbuffer())
         solution = SolutionCO22(temppath, instance, 'txt')
         day = st.selectbox(label="Day", options = list(range(1,instance.Days+1)))
-        st.pyplot(plotSolution(solution, day))
+        st.pyplot(plotSolution(solution, day, loclabels))
         st.write(solution.calcCost.__dict__)
     except Exception as e:
         st.write("Make sure the solution is for the selected instance")
