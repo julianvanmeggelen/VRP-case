@@ -49,6 +49,7 @@ class Node(object):
         self.reqID = reqID
         self.locID = locID
         self.amounts = amounts
+        self.daysDeliveredEarly = 0
         if amounts is not None:
             self.demand = sum(amounts)
         self.isHub = isHub
@@ -330,20 +331,33 @@ class DayHubRoutes(object):
 class HubRoutes(object):
     def __init__(self):
         self.hubRoutes = {}
-        self.deliverEarlyPenalty = 0
+        self.deliverEarlyPenalties = {} #{nodeid: penaltu}
         
     def addDayHubRoutes(self,day, dayHubRoutes: DayHubRoutes):
         self.hubRoutes[day] = dayHubRoutes
 
-    def computeCost(self, vanDistanceCost, vanDayCost, vanCost, distanceMatrix: DistanceMatrix):
+    def isFeasible(self, VanCapacity, VanMaxDistance, dm, verbose=False):
+        for day, dayHubRoutes in self.hubRoutes.items():
+            if not dayHubRoutes.isFeasible(VanCapacity, VanMaxDistance, dm, verbose):
+                return False
+        return True
+
+    def computeCost(self, vanDistanceCost, vanDayCost, vanCost, deliverEarlyPenalty, distanceMatrix: DistanceMatrix):
         cost = 0
-        cost += self.deliverEarlyPenalty
 
         for day, dayHubRoutes in self.hubRoutes.items():
             cost += dayHubRoutes.computeCost(vanDistanceCost, vanDayCost, distanceMatrix)
         cost += self.nVansRequired() * vanCost
 
+        cost+=self.deliverEarlyPenalty(cost=deliverEarlyPenalty)
+
         return cost
+
+    def deliverEarlyPenalty(self, cost):
+        res=0
+        for reqID, daysEarly in self.deliverEarlyPenalties.items():
+            res += cost**(daysEarly)
+        return res
 
     def nVansRequired(self):
         return max([len(dayHubRoutes) for day, dayHubRoutes in self.hubRoutes.items()])
@@ -380,4 +394,35 @@ class HubRoutes(object):
         return self.hubRoutes[i]
 
     # operators for neighbourhood exploration
+
+    def randomMoveNodeDayEarly(self):
+        #move random node to a day earlier to
+        day = random.randint(2,20)
+        while len(self.hubRoutes[day]) < 1:
+            day = random.randint(2,20)
+        r1 = random.choice(self.hubRoutes[day].routes)
+
+        #print(r1)
+        n1 = random.choice(r1.nodes)
+        #print(n1)
+
+        if len(self.hubRoutes[day-1]) == 0:
+            return self
+
+        r2 = random.choice(self.hubRoutes[day-1].routes)
+        #print('r2before',r2)
+        n1.daysDeliveredEarly +=1
+        r1.deleteNode(n1)  
+        insertBefore = random.randint(0,len(r2)+1)                       
+        r2.insertNodeBefore(insertBefore, n1)  
+        #print('r2after',r2)
+
+        if len(r1) == 0:
+            self.hubRoutes[day].routes.remove(r1)
+
+        self.deliverEarlyPenalties[n1.reqID] = n1.daysDeliveredEarly
+
+        return self
+        
+
 
