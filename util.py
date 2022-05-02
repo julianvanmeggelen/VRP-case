@@ -15,7 +15,9 @@ def loadInstance(instanceNr: int) -> InstanceCO22:
     folders = ["Instance_1-10/","Instance_11-20/","Instance_21-30/"]
     folder = folders[math.floor((instanceNr-1)/10)]
     path = base + folder + f"Instance_{instanceNr}.txt"
-    return InstanceCO22(inputfile = path, filetype = 'txt')
+    instance = InstanceCO22(inputfile = path, filetype = 'txt')
+    instance.CACHE_ID = instanceNr
+    return instance
 
 def plotInstance(instance):
     plt.figure(figsize=(7,7))
