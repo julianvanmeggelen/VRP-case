@@ -168,13 +168,13 @@ class HubRoute(object):
         return i
 
     def checkHubCanServe(self, instance):
-        if self.cachedHubCanServe:
-            return self.cachedHubCanServe
+        #if self.cachedHubCanServe:
+        #    return self.cachedHubCanServe
 
         reqIDs = set([_.reqID for _ in self.nodes])
         hubAllowedReqIDs = set(instance.Hubs[self.hubLocID-2].allowedRequests)
         hubsCanServe = len(reqIDs-hubAllowedReqIDs) == 0
-        self.cachedHubCanServe = hubsCanServe
+        #self.cachedHubCanServe = hubsCanServe
         return hubsCanServe
 
     def length(self, distanceMatrix: DistanceMatrix):  # distance length
