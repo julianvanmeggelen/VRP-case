@@ -127,86 +127,117 @@ class randomLocalSearch(object):
 
 class TreeSearch(object):
     def __init__(self, instance: InstanceCO22, initialState: HubRoutes, infeasibilityLevel = 0, searchLevel = 0, maxChildren = 10, initialStateCost = None, parent = None):
+
+        self.instance = instance
         self.initialState = initialState
         self.infeasibilityLevel = infeasibilityLevel
         self.searchLevel = searchLevel
         self.maxChildren = maxChildren
         self.bestState = initialState
 
-        if parent:
+        if parent:  #if parent is provided no need to recompute these properties
             self.allHubLocIDs = parent.allHubLocIDs
+            self.useHubOpeningCost = parent.useHubOpeningCost
+            self.distanceMatrix = parent.distanceMatrix
+            self.useCheckHubCanServe = parent.useCheckHubCanServe
         else:
             self.allHubLocIDs = set([_.ID+1 for _ in self.instance.Hubs])
+            self.useHubOpeningCost = any([_.hubOpeningCost > 0 for _ in instance.Hubs])
+            self.distanceMatrix = DistanceMatrix(instance)
+            self.useCheckHubCanServe = any([len(_.allowedRequests) != len(instance.Requests) for _ in instance.Hubs])
 
         if initialStateCost:
-            self.bestStateCost = initialStateCost
+            self.initialStateCost = initialStateCost
         else:
-            self.bestStateCost = self.computeStateCost(initialState)
+            self.initialStateCost = self.computeStateCost(initialState)
 
-        self.N_OPERATORS = 6
-        self.MAX_INFEASIBILITY_LEVEL = 5
+        self.N_OPERATORS = 5
+        self.MAX_INFEASIBILITY_LEVEL = 0
 
 
     def computeStateCost(self, state):
         return state.computeCost(self.instance.VanDistanceCost, self.instance.VanDayCost, self.instance.VanCost, self.instance.deliverEarlyPenalty, self.distanceMatrix, self.useHubOpeningCost, self.instance)
 
     def checkFeasibleState(self, state):
-        return state.isFeasible(self.instance.VanCapacity, self.instance.VanMaxDistance, self.distanceMatrix, self.instance, verbose=False, useCheckHubCanServe=self.useCheckhHubCanServe)
+        return state.isFeasible(self.instance.VanCapacity, self.instance.VanMaxDistance, self.distanceMatrix, self.instance, verbose=False, useCheckHubCanServe=self.useCheckHubCanServe)
 
-    def checkBetterState(self, neighbour, i, operator):
-        neighbourCost = self.computeStateCost(neighbour)
-        if neighbourCost < self.currentStateCost:
-            if self.checkFeasibleState(neighbour):
-                self.bestStae = neighbour
-                self.bestStateCost = neighbourCost
-                if self.verbose:
-                    #self._progressBar(i, f"[{i}] NB better than current state: {neighbourCost} {operator}")
-                    return
-        #self._progressBar(i, msg="")
-        return
+    def generateChild(self, randomNr, day):
+        #using the random assigned operator, generate one child
 
-    def generateChild(self, randomNr):
+        #self._log(f"Applied operator {randomNr} to day {day}")
         neighbour = self.initialState.copy()
         if randomNr ==0:
-            neighbour.randomMergeRoutes()
+            neighbour.applyOperator(day, 0)
         elif randomNr ==1:
-            neighbour.randomNodeInsertion()
+            neighbour.applyOperator(day, 1)
         elif randomNr ==2:
-            neighbour.randomSectionInsertion()
+            neighbour.applyOperator(day, 2)
         elif randomNr ==3:
-            neighbour.randomMoveNodeDayEarly()
+            neighbour.applyOperator(day, 3)
         elif randomNr ==4:  
             neighbour.randomChooseOtherHub(self.allHubLocIDs)
+        elif randomNr ==5:
+            neighbour.randomMoveNodeDayEarly()
         
         return neighbour
 
-
     def generateChildren(self) -> List[HubRoutes]:
+        #generate maxChildren child nodes
         self.neighbours = []
-        operators = list(np.random.randint(0,self.N_OPERATORS, self.maxChildren))   
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.maxChildren))   
+        days = list(np.random.randint(1, 21, self.maxChildren))   
         for i in range(self.maxChildren):
-            neighbour = self.generateChild(operators.pop())
+            neighbour = self.generateChild(operators.pop(), days.pop())
             self.neighbours.append(neighbour)
 
+    def _log(self, msg):
+        spacer = " " * self.searchLevel + "|- "
+        print(spacer + msg)
+
+
     def searchChildren(self):
-        childBestStates = []
+        #evaluate cost of every child (neighbour), if cost is better than current and state is feasible, start search from the child, if cost is better but not feasible start new search with 1 deducted from infeasibilityLevel
+        self.childBestState = self.initialState
+        self.childBestStateCost = self.initialStateCost
+
+
+
         for child in self.neighbours:
-            neighBourCost = self.computeStateCost(child)
-            if neighBourCost < self.bestStateCost:
-                if self.checkFeasibleState(child):
-                    newSearcher = TreeSearch(child, infeasibilityLevel=0,searchLevel=self.searchLevel+1, maxChildren=self.maxChildren)
-                    newSearcherBestState = newSearcher.search()
-                    childBestStates
-                else:
+            #self._log("Searching new child")
+            neighbourCost = self.computeStateCost(child)
+            if neighbourCost < self.initialStateCost:
+                self._log(f"Child has better cost: {neighbourCost}")
+
+                if self.checkFeasibleState(child):  #child yields better cost and is feasible
+                    newSearcher = TreeSearch(self.instance, child, infeasibilityLevel=0,searchLevel=self.searchLevel+1, maxChildren=self.maxChildren, initialStateCost = neighbourCost, parent=self)
+                    newSearcherBestState, newSearcherBestStateCost = newSearcher.run()
+                else:                               #child yields better cost but is not feasible
                     if self.infeasibilityLevel + 1 > self.MAX_INFEASIBILITY_LEVEL:
-                        return 
+                        self._log(f" {self.searchLevel} Branch exited because max infeasibilitylevel reached")
+                        continue                    #reached max infeasibility level
                     else:
-                        newSearcher = TreeSearch(child, infeasibilityLevel=self.infeasibilityLevel+1,searchLevel=self.searchLevel+1, maxChildren=self.maxChildren)
-                        newSearcherBestState = newSearcher.search()
+                        newSearcher = TreeSearch(self.instance, child, infeasibilityLevel=self.infeasibilityLevel+1,searchLevel=self.searchLevel+1, maxChildren=self.maxChildren, initialStateCost = neighbourCost, parent=self)
+                        newSearcherBestState, newSearcherBestStateCost = newSearcher.run()
+                
+                #check if the child is better than the current best child
+                if newSearcherBestStateCost < self.childBestStateCost and self.checkFeasibleState(newSearcherBestState):
+                    self.childBestState = newSearcherBestState
+                    self.childBestStateCost = newSearcherBestStateCost
+            else:
+                continue
+                #self._log("Child not better cost")
+        
+        return self.childBestState, self.childBestStateCost
 
+    def run(self) -> HubRoutes:
+        spacer = (self.searchLevel-1)*" " + "_"
+        print(spacer)
+        self._log(f"Starting search on branch with infeasibility level {self.infeasibilityLevel} and search level {self.searchLevel} and initialCost {self.initialStateCost}")
+        self.generateChildren()
+        childBestState, childBestStateCost = self.searchChildren()
+        self._log(f"Finished search on branch starting at initialCost {self.initialStateCost} finishing at {childBestStateCost}")
+        return childBestState, childBestStateCost
 
-    def search(self) -> HubRoutes:
-        return 
 
 
 
