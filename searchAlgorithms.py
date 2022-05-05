@@ -1,3 +1,5 @@
+from pyclbr import Function
+from xmlrpc.client import Boolean, boolean
 from dataClasses import *
 from typing import Callable
 from validator.InstanceCO22 import InstanceCO22
@@ -464,7 +466,7 @@ class EvolutionarySearch(object):
 
         return selectedNeighbours
 
-    def run(self, parallel = True):
+    def run(self, parallel = True, earlyStopping: Callable[[List[float]],bool] = lambda costs: False):
 
         if parallel:
             self.nJobs = cpu_count()
@@ -483,6 +485,10 @@ class EvolutionarySearch(object):
             self.costs.append(self.bestStateCost)
 
             elapsedTime = time.time() - iterationStartTime
+
+            if earlyStopping(self.costs):
+                break
+
             print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} elapsed: {elapsedTime:.2f}")
         elapsedTime = time.time() - startTime
         print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
