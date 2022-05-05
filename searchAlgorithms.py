@@ -4,6 +4,7 @@ from validator.InstanceCO22 import InstanceCO22
 import time
 import random
 import numpy as np
+from joblib import Parallel, delayed, cpu_count
 
 
 
@@ -237,6 +238,262 @@ class TreeSearch(object):
         childBestState, childBestStateCost = self.searchChildren()
         self._log(f"Finished search on branch starting at initialCost {self.initialStateCost} finishing at {childBestStateCost}")
         return childBestState, childBestStateCost
+
+class EvolutionarySearchOld(object):
+    def __init__(self, instance: InstanceCO22, initialState: HubRoutes, infeasibilityLevel = 0, searchLevel = 0, maxChildren = 10, initialStateCost = None, parent = None):
+
+        self.instance = instance
+        self.initialState = initialState
+        self.infeasibilityLevel = infeasibilityLevel
+        self.searchLevel = searchLevel
+        self.maxChildren = maxChildren
+        self.bestState = initialState
+
+        if parent:  #if parent is provided no need to recompute these properties
+            self.allHubLocIDs = parent.allHubLocIDs
+            self.useHubOpeningCost = parent.useHubOpeningCost
+            self.distanceMatrix = parent.distanceMatrix
+            self.useCheckHubCanServe = parent.useCheckHubCanServe
+        else:
+            self.allHubLocIDs = set([_.ID+1 for _ in self.instance.Hubs])
+            self.useHubOpeningCost = any([_.hubOpeningCost > 0 for _ in instance.Hubs])
+            self.distanceMatrix = DistanceMatrix(instance)
+            self.useCheckHubCanServe = any([len(_.allowedRequests) != len(instance.Requests) for _ in instance.Hubs])
+
+        if initialStateCost:
+            self.initialStateCost = initialStateCost
+        else:
+            self.initialStateCost = self.computeStateCost(initialState)
+
+        self.N_OPERATORS = 5
+        self.MAX_INFEASIBILITY_LEVEL = 0
+        self.SELECTION_SIZE = 1
+
+
+    def computeStateCost(self, state):
+        return state.computeCost(self.instance.VanDistanceCost, self.instance.VanDayCost, self.instance.VanCost, self.instance.deliverEarlyPenalty, self.distanceMatrix, self.useHubOpeningCost, self.instance)
+
+    def checkFeasibleState(self, state):
+        return state.isFeasible(self.instance.VanCapacity, self.instance.VanMaxDistance, self.distanceMatrix, self.instance, verbose=False, useCheckHubCanServe=self.useCheckHubCanServe)
+
+    def generateChild(self, randomNr, day):
+        #using the random assigned operator, generate one child
+
+        #self._log(f"Applied operator {randomNr} to day {day}")
+        neighbour = self.initialState.copy()
+        if randomNr ==0:
+            neighbour.applyOperator(day, 0)
+        elif randomNr ==1:
+            neighbour.applyOperator(day, 1)
+        elif randomNr ==2:
+            neighbour.applyOperator(day, 2)
+        elif randomNr ==3:
+            neighbour.applyOperator(day, 3)
+        elif randomNr ==4:  
+            neighbour.randomChooseOtherHub(self.allHubLocIDs)
+        elif randomNr ==5:
+            neighbour.randomMoveNodeDayEarly()
+        
+        return neighbour
+
+    def generateChildren(self) -> List[HubRoutes]:
+        #generate maxChildren child nodes
+        self.neighbours = []
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.maxChildren))   
+        days = list(np.random.randint(1, 21, self.maxChildren))   
+        for i in range(self.maxChildren):
+            neighbour = self.generateChild(operators.pop(), days.pop())
+            self.neighbours.append(neighbour)
+
+    def _log(self, msg):
+        spacer = " " * self.searchLevel + "|-"
+        print(spacer, msg)
+
+
+    def searchChildren(self):
+        #evaluate cost of every child (neighbour), if cost is better than current and state is feasible, start search from the child, if cost is better but not feasible start new search with 1 deducted from infeasibilityLevel
+        self.childBestState = self.initialState
+        self.childBestStateCost = self.initialStateCost
+
+        neighbourFeasible = [self.checkFeasibleState(nb) for nb in self.neighbours]
+        neighbourCosts = [self.computeStateCost(nb) if neighbourFeasible[i] else math.inf for i, nb in enumerate(self.neighbours)]
+
+        selectedNeighboursIndices = sorted(range(len(neighbourCosts)), key=lambda k: neighbourCosts[k])[0:self.SELECTION_SIZE]
+        selectedNeighbours = [_ for i,_ in enumerate(self.neighbours) if i in selectedNeighboursIndices]
+
+        for i, child in enumerate(selectedNeighbours):
+            #self._log("Searching new child")
+            neighbourCost = neighbourCosts[i]
+
+            if neighbourFeasible[i]: #check feasible 
+                newSearcher = EvolutionarySearchOld(self.instance, child, infeasibilityLevel=self.infeasibilityLevel+1,searchLevel=self.searchLevel+1, maxChildren=self.maxChildren, initialStateCost = neighbourCost, parent=self)
+                newSearcherBestState, newSearcherBestStateCost = newSearcher.run()
+                    
+                #check if the child is better than the current best child
+                if newSearcherBestStateCost < self.childBestStateCost:
+                    self.childBestState = newSearcherBestState
+                    self.childBestStateCost = newSearcherBestStateCost
+                else:
+                    continue
+                    #self._log("Child not better cost")
+        
+        return self.childBestState, self.childBestStateCost
+
+    def run(self) -> HubRoutes:
+        spacer = (self.searchLevel-1)*" " + "_"
+        print(spacer)
+        self._log(f"Starting search on branch with infeasibility level {self.infeasibilityLevel} and search level {self.searchLevel} and initialCost {self.initialStateCost}")
+        self.generateChildren()
+        childBestState, childBestStateCost = self.searchChildren()
+        self._log(f"Finished search on branch starting at initialCost {self.initialStateCost} finishing at {childBestStateCost}")
+        return childBestState, childBestStateCost
+
+
+class EvolutionarySearch(object):
+    def __init__(self, instance: InstanceCO22, initialState: HubRoutes, generationSize, candidateSize, nGenerations):
+
+
+        self.instance = instance
+        self.distanceMatrix = DistanceMatrix(instance)
+        self.initialState = initialState
+
+        self.allHubLocIDs = set([_.ID+1 for _ in self.instance.Hubs])
+        self.useHubOpeningCost = any([_.hubOpeningCost > 0 for _ in instance.Hubs])
+        self.useCheckHubCanServe = any([len(_.allowedRequests) != len(instance.Requests) for _ in instance.Hubs])
+        self.optimizeDeliverEarly = (instance.deliverEarlyPenalty > 0)
+
+        self.initialStateCost = self.computeStateCost(initialState)
+        self.bestState = initialState
+        self.bestStateCost = self.initialStateCost
+        self.costs = [self.bestStateCost]
+
+
+        self.generations = [[initialState]]
+
+        self.N_OPERATORS = 4 + self.optimizeDeliverEarly
+
+        self.generationSize, self.candidateSize, self.nGenerations = generationSize, candidateSize, nGenerations
+
+
+    def computeStateCost(self, state):
+        return state.computeCost(self.instance.VanDistanceCost, self.instance.VanDayCost, self.instance.VanCost, self.instance.deliverEarlyPenalty, self.distanceMatrix, self.useHubOpeningCost, self.instance)
+
+    def checkFeasibleState(self, state):
+        return state.isFeasible(self.instance.VanCapacity, self.instance.VanMaxDistance, self.distanceMatrix, self.instance, verbose=False, useCheckHubCanServe=self.useCheckHubCanServe)
+
+    def generateChild(self, mem, randomNr=None, day=None):
+            #using the random assigned operator, generate one child
+
+        if randomNr == None:
+            randomNr = random.randint(0,self.N_OPERATORS)
+
+        if day == None:
+            day = random.randint(1,20)
+
+        #self._log(f"Applied operator {randomNr} to day {day}")
+        neighbour = mem.copy()
+        if randomNr ==0:
+            neighbour.applyOperator(day, 0)
+        elif randomNr ==1:
+            neighbour.applyOperator(day, 1)
+        elif randomNr ==2:
+            neighbour.applyOperator(day, 2)
+        elif randomNr ==3:
+            neighbour.applyOperator(day, 3)
+        elif randomNr ==4:  
+            neighbour.randomChooseOtherHub(self.allHubLocIDs)
+        elif randomNr ==5:
+            neighbour.randomMoveNodeDayEarly()
+        
+        return neighbour
+
+    def generateCandidates(self, prevGen: List[HubRoutes]) -> List[HubRoutes]:
+
+        nextGen = []
+        prevGenSize = len(prevGen)
+        candidatesPerGenMember = round(self.candidateSize / prevGenSize)
+
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.candidateSize ))   
+        days = list(np.random.randint(1, 21, self.candidateSize ))
+
+        for mem in prevGen:
+            for i in range(candidatesPerGenMember):
+                neighbour = self.generateChild(mem, operators.pop(), days.pop())
+                nextGen.append(neighbour)
+
+        return nextGen
+
+    def generateCandidatesParallel(self, prevGen: List[HubRoutes]) -> List[HubRoutes]:
+
+        def generateBatch(batch):
+            #generate candidatesPerGenMember neighbours for mem
+            res = []
+            for mem in batch:
+                for i in range(candidatesPerGenMember):
+                    res.append(self.generateChild(mem))
+            return res
+    
+        nextGen = []
+        batches = np.array_split(prevGen, self.nJobs)
+        prevGenSize = len(prevGen)
+        candidatesPerGenMember = round(self.candidateSize / prevGenSize)
+
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.candidateSize ))   
+        days = list(np.random.randint(1, 21, self.candidateSize ))
+
+        
+        res = Parallel(n_jobs=-1)(delayed(generateBatch)(batch) for batch in batches)
+
+        for batch in res:
+            nextGen += batch
+
+        return nextGen
+
+    def selectNextGeneration(self, candidates: List[HubRoutes]) -> List[HubRoutes]: #returns sorted nextgeneration
+        neighbourFeasible = [self.checkFeasibleState(nb) for nb in candidates]
+        neighbourCosts = [self.computeStateCost(nb) if neighbourFeasible[i] else math.inf for i, nb in enumerate(candidates)]
+        #print(neighbourCosts)
+
+        selectedNeighboursIndices = sorted(range(len(neighbourCosts)), key=lambda k: neighbourCosts[k])[0:self.generationSize]
+        #print([neighbourCosts[i] for i in selectedNeighboursIndices])
+        selectedNeighbours = [_ for i,_ in enumerate(candidates) if i in selectedNeighboursIndices and neighbourFeasible[i]]
+        #print(neighbourCosts[selectedNeighboursIndices[0]])
+        if neighbourCosts[selectedNeighboursIndices[0]] < self.bestStateCost: # check if best of generation is better than current best
+            self.bestState = selectedNeighbours[0]
+            self.bestStateCost = neighbourCosts[selectedNeighboursIndices[0]]
+
+        return selectedNeighbours
+
+    def run(self, parallel = True):
+
+        if parallel:
+            self.nJobs = cpu_count()
+            print(f"Using parallel computing for neighbour generation with nJobs = {self.nJobs}")
+        startTime=time.time()
+        for i in range(1, self.nGenerations+2):
+            iterationStartTime = time.time()
+
+            prevGen = self.generations[i-1]
+            if parallel:
+                nextGenCandidates = self.generateCandidatesParallel(prevGen)
+            else:
+                nextGenCandidates = self.generateCandidates(prevGen)
+            nextGen = self.selectNextGeneration(nextGenCandidates)
+            self.generations.append(nextGen)
+            self.costs.append(self.bestStateCost)
+
+            elapsedTime = time.time() - iterationStartTime
+            print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} elapsed: {elapsedTime:.2f}")
+        elapsedTime = time.time() - startTime
+        print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
+        return self.bestState, self.bestStateCost
+    
+
+        
+
+
+
+
 
 
 
