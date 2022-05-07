@@ -1,4 +1,5 @@
 
+from re import L
 from util import *
 import numpy as np
 import pandas as pd
@@ -562,3 +563,27 @@ class HubRoutes(object):
                 dayHubRoutes.replaceHub(h1, h2)
                 self.hubsUsedCaching[day] = None
         return self
+
+
+class DepotRoutes(object):
+    def __init__():
+        return
+
+class solution(object):
+    def __init__(self, hubRoutes: HubRoutes, depotRoutes: DepotRoutes):
+        self.depotRoutes = depotRoutes
+        self.hubRoutes = hubRoutes
+        self.depotRecomputeNecessary = False
+    
+    def computeCost(self, instance, hubCost=True, depotCost=True):
+        raise NotImplementedError
+    
+    def isFeasible(self):
+        raise NotImplementedError
+
+    def computeDepotSolution(self):
+        #recompute depot solution when infeasible because hubsolution has been 
+        raise NotImplementedError
+    
+
+

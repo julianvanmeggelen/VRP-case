@@ -368,6 +368,7 @@ class EvolutionarySearch(object):
         self.bestState = initialState
         self.bestStateCost = self.initialStateCost
         self.costs = [self.bestStateCost]
+        self.allCosts = [[self.bestStateCost]]
 
 
         self.generations = [[initialState]]
@@ -457,7 +458,10 @@ class EvolutionarySearch(object):
         #print(neighbourCosts)
 
         selectedNeighboursIndices = sorted(range(len(neighbourCosts)), key=lambda k: neighbourCosts[k])[0:self.generationSize]
-        #print([neighbourCosts[i] for i in selectedNeighboursIndices])
+        selectedNeighboursCosts = [neighbourCosts[i] for i in selectedNeighboursIndices]
+
+        self.allCosts.append(selectedNeighboursCosts)
+
         selectedNeighbours = [_ for i,_ in enumerate(candidates) if i in selectedNeighboursIndices and neighbourFeasible[i]]
         #print(neighbourCosts[selectedNeighboursIndices[0]])
         if neighbourCosts[selectedNeighboursIndices[0]] < self.bestStateCost: # check if best of generation is better than current best
@@ -489,7 +493,7 @@ class EvolutionarySearch(object):
             if earlyStopping(self.costs):
                 break
 
-            print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} elapsed: {elapsedTime:.2f}")
+            print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} generationCostVariance: {np.std(self.allCosts[-1]):.2f} elapsed: {elapsedTime:.2f}")
         elapsedTime = time.time() - startTime
         print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
         return self.bestState, self.bestStateCost
