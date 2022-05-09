@@ -352,6 +352,7 @@ class EvolutionarySearchOld(object):
 
 
 class EvolutionarySearch(object):
+    #evolutionary search on HubRoutes
     def __init__(self, instance: InstanceCO22, initialState: HubRoutes, generationSize, candidateSize, nGenerations):
 
 
@@ -385,7 +386,7 @@ class EvolutionarySearch(object):
         return state.isFeasible(self.instance.VanCapacity, self.instance.VanMaxDistance, self.distanceMatrix, self.instance, verbose=False, useCheckHubCanServe=self.useCheckHubCanServe)
 
     def generateChild(self, mem, randomNr=None, day=None):
-            #using the random assigned operator, generate one child
+        #using the random assigned operator, generate one child
 
         if randomNr == None:
             randomNr = random.randint(0,self.N_OPERATORS)
@@ -394,15 +395,16 @@ class EvolutionarySearch(object):
             day = random.randint(1,20)
 
         #self._log(f"Applied operator {randomNr} to day {day}")
+
         neighbour = mem.copy()
         if randomNr ==0:
-            neighbour.applyOperator(day, 0)
+            neighbour.intraDayRandomMergeRoutes(day)
         elif randomNr ==1:
-            neighbour.applyOperator(day, 1)
+            neighbour.intraDayRandomNodeInsertion(day)
         elif randomNr ==2:
-            neighbour.applyOperator(day, 2)
+            neighbour.intraDayRandomSectionInsertion(day)
         elif randomNr ==3:
-            neighbour.applyOperator(day, 3)
+            neighbour.intraDayShuffleRoute(day)
         elif randomNr ==4:  
             neighbour.randomChooseOtherHub(self.allHubLocIDs)
         elif randomNr ==5:
@@ -477,6 +479,184 @@ class EvolutionarySearch(object):
             print(f"Using parallel computing for neighbour generation with nJobs = {self.nJobs}")
         startTime=time.time()
         for i in range(1, self.nGenerations+2):
+            iterationStartTime = time.time()
+
+            prevGen = self.generations[i-1]
+            if parallel:
+                nextGenCandidates = self.generateCandidatesParallel(prevGen)
+            else:
+                nextGenCandidates = self.generateCandidates(prevGen)
+            nextGen = self.selectNextGeneration(nextGenCandidates)
+            self.generations.append(nextGen)
+            self.costs.append(self.bestStateCost)
+
+            elapsedTime = time.time() - iterationStartTime
+
+            if earlyStopping(self.costs):
+                break
+
+            print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} generationCostVariance: {np.std(self.allCosts[-1]):.2f} elapsed: {elapsedTime:.2f}")
+        elapsedTime = time.time() - startTime
+        print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
+        return self.bestState, self.bestStateCost
+
+
+class EvolutionarySearchBothEchelons(object):
+    #evolutionarySearch on Solution
+
+    def __init__(self, instance: InstanceCO22, initialState: Solution, generationSize, candidateSize, nGenerations=50):
+
+
+        self.instance = instance
+        self.distanceMatrix = DistanceMatrix(instance)
+        self.initialState = initialState
+
+        self.allHubLocIDs = set([_.ID+1 for _ in self.instance.Hubs])
+        self.useHubOpeningCost = any([_.hubOpeningCost > 0 for _ in instance.Hubs])
+        self.useCheckHubCanServe = any([len(_.allowedRequests) != len(instance.Requests) for _ in instance.Hubs])
+        self.optimizeDeliverEarly = (instance.deliverEarlyPenalty > 0)
+
+        
+        self.bestState = initialState
+        self.costsInitialised = False
+        self.generations = [[initialState]]
+
+        self.N_OPERATORS = 4 + self.optimizeDeliverEarly
+
+        self.generationSize, self.candidateSize, self.nGenerations = generationSize, candidateSize, nGenerations
+
+
+    def computeStateCost(self, state):
+        return state.computeCost(instance=self.instance, hubCost=True, depotCost=self.useDepotCost, distanceMatrix=self.distanceMatrix, useHubOpeningCost=self.useHubOpeningCost)
+
+    def checkFeasibleState(self, state, depot=True):
+        return state.isFeasible(instance=self.instance, distanceMatrix=self.distanceMatrix, useCheckHubCanServe=self.useCheckHubCanServe, depot=depot)
+
+    def generateChild(self, mem, randomNr=None, day=None):
+        #using the random assigned operator, generate one child
+
+        if randomNr == None:
+            randomNr = random.randint(0,self.N_OPERATORS)
+
+        if day == None:
+            day = random.randint(1,20)
+
+        #self._log(f"Applied operator {randomNr} to day {day}")
+
+        neighbour = mem.copy()
+        if randomNr ==0:
+            neighbour.hubIntraDayRandomMergeRoutes(day)
+        elif randomNr ==1:
+            neighbour.hubIntraDayRandomNodeInsertion(day)
+        elif randomNr ==2:
+            neighbour.hubIntraDayRandomSectionInsertion(day)
+        elif randomNr ==3:
+            neighbour.hubIntraDayShuffleRoute(day)
+        elif randomNr ==4:  
+            neighbour.hubRandomChooseOtherHub(self.allHubLocIDs)
+        elif randomNr ==5:
+            neighbour.hubRandomMoveNodeDayEarly()
+        
+        return neighbour
+
+    def generateCandidates(self, prevGen: List[Solution]) -> List[Solution]:
+
+        nextGen = []
+        prevGenSize = len(prevGen)
+        candidatesPerGenMember = round(self.candidateSize / prevGenSize)
+
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.candidateSize ))   
+        days = list(np.random.randint(1, 21, self.candidateSize ))
+
+        for mem in prevGen:
+            for i in range(candidatesPerGenMember):
+                neighbour = self.generateChild(mem, operators.pop(), days.pop())
+                nextGen.append(neighbour)
+
+        return nextGen
+
+    def generateCandidatesParallel(self, prevGen: List[Solution]) -> List[Solution]:
+
+        def generateBatch(batch):
+            #generate candidatesPerGenMember neighbours for mem
+            res = []
+            for mem in batch:
+                for i in range(candidatesPerGenMember):
+                    res.append(self.generateChild(mem))
+            return res
+    
+        nextGen = []
+        batches = np.array_split(prevGen, self.nJobs)
+        prevGenSize = len(prevGen)
+        candidatesPerGenMember = round(self.candidateSize / prevGenSize)
+
+        operators = list(np.random.randint(0,self.N_OPERATORS+1, self.candidateSize ))   
+        days = list(np.random.randint(1, 21, self.candidateSize ))
+
+        
+        res = Parallel(n_jobs=-1)(delayed(generateBatch)(batch) for batch in batches)
+
+        for batch in res:
+            nextGen += batch
+
+        return nextGen
+
+    def recomputeDepotRoutes(self, feasibleNeighbours):
+        if self.recomputeDepotRoute:
+            if self.parallel:
+                fun = lambda nb: nb.compcomputeDepotSolution(self.instance)
+                res = Parallel(n_jobs=-1)(delayed(fun)(nb) for nb in feasibleNeighbours)
+            else:
+                for nb in feasibleNeighbours:   #recompute depotroutes if necessary
+                    nb.computeDepotSolution(instance=self.instance)
+        return feasibleNeighbours
+
+
+    def selectNextGeneration(self, candidates: List[Solution]) -> List[Solution]: #returns sorted nextgeneration
+        feasibleNeighbours = [nb for nb in candidates if self.checkFeasibleState(nb, depot=False)]
+
+        feasibleNeighbours = self.recomputeDepotRoutes(feasibleNeighbours)
+
+        neighbourCosts = [self.computeStateCost(nb) for nb in feasibleNeighbours]
+        #print(neighbourCosts)
+
+        selectedNeighboursIndices = sorted(range(len(neighbourCosts)), key=lambda k: neighbourCosts[k])[0:self.generationSize]
+        selectedNeighboursCosts = [neighbourCosts[i] for i in selectedNeighboursIndices]
+
+        self.allCosts.append(selectedNeighboursCosts)
+
+        selectedNeighbours = [_ for i,_ in enumerate(feasibleNeighbours) if i in selectedNeighboursIndices]
+        
+        #print(neighbourCosts[selectedNeighboursIndices[0]])
+        if neighbourCosts[selectedNeighboursIndices[0]] < self.bestStateCost: # check if best of generation is better than current best
+            self.bestState = selectedNeighbours[0]
+            self.bestStateCost = neighbourCosts[selectedNeighboursIndices[0]]
+
+        return selectedNeighbours
+
+    def initCosts(self):
+        self.initialStateCost = self.computeStateCost(self.initialState)
+        self.bestStateCost = self.initialStateCost
+        if not self.costsInitialised:
+            self.costs = [self.bestStateCost]
+            self.allCosts = [[self.bestStateCost]]
+            self.costsInitialised = True
+        
+
+    def run(self, parallel = True, earlyStopping: Callable[[List[float]],bool] = lambda costs: False, recomputeDepotRoute = True, useDepotCost = True, nGenerations = None):
+        self.recomputeDepotRoute = recomputeDepotRoute
+        self.useDepotCost = useDepotCost
+        self.parallel = parallel
+
+        self.initCosts()
+        
+        nGenerations = nGenerations if nGenerations else self.nGenerations
+        print(f"Recomputing depot route: {recomputeDepotRoute}, using depot route cost: {useDepotCost}, initialStateCost: {self.initialStateCost}")
+        if parallel:
+            self.nJobs = cpu_count()
+            print(f"Using parallel computing for neighbour generation with nJobs = {self.nJobs}")
+        startTime=time.time()
+        for i in range(len(self.generations), len(self.generations)+ nGenerations+2):
             iterationStartTime = time.time()
 
             prevGen = self.generations[i-1]

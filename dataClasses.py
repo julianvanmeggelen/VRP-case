@@ -7,6 +7,7 @@ from typing import List, Set, Tuple, Dict
 import random
 from validator.InstanceCO22 import InstanceCO22
 import copy
+import initialSolutions
 
 
 class DistanceMatrix(object):
@@ -56,7 +57,7 @@ class DistanceMatrix(object):
         return self.instance.Requests[reqID-1].customerLocID
 
 
-class Node(object):
+class RequestNode(object):
 
     # node carrying request data
 
@@ -98,19 +99,19 @@ class HubRoute(object):
         self.cachedDistance = None
         self.cachedHubCanServe = None
 
-    def addNode(self, node: Node):
+    def addNode(self, node: RequestNode):
         # add node to end of route
         self.nodes.append(node)
         self.cachedDistance = None
         self.cachedHubCanServe = None
         return self
 
-    def addNodes(self, nodes: List[Node]):
+    def addNodes(self, nodes: List[RequestNode]):
         for node in nodes:
             self.addNode(node)
         return self
 
-    def insertNodeAfter(self, i, newNode: Node):
+    def insertNodeAfter(self, i, newNode: RequestNode):
         # insert node after specified index
         #appendAfterIndex = self._findIndexOfID(reqID)
         self.nodes.insert(i+1, newNode)
@@ -119,7 +120,7 @@ class HubRoute(object):
 
         return self
 
-    def insertNodeBefore(self, i, newNode: Node):
+    def insertNodeBefore(self, i, newNode: RequestNode):
         # insert node after specified index
         #appendBeforeIndex = self._findIndexOfID(reqID)
         self.nodes.insert(i, newNode)
@@ -133,7 +134,7 @@ class HubRoute(object):
         self.cachedDistance = None
         self.cachedHubCanServe = None
 
-    def deleteNodes(self, nodes: List[Node]):
+    def deleteNodes(self, nodes: List[RequestNode]):
         for node in nodes:
             self.deleteNode(node)
         self.cachedDistance = None
@@ -146,7 +147,7 @@ class HubRoute(object):
         self.cachedDistance = None
         self.cachedHubCanServe = None
 
-    def replaceNode(self, reqID, newNode: Node):
+    def replaceNode(self, reqID, newNode: RequestNode):
         indexToReplace = self._findIndexOfID(reqID)
         self.nodes[indexToReplace] = newNode
         self.cachedDistance = None
@@ -169,7 +170,7 @@ class HubRoute(object):
         return i
 
     def checkHubCanServe(self, instance):
-        #if self.cachedHubCanServe:
+        # if self.cachedHubCanServe:
         #    return self.cachedHubCanServe
 
         reqIDs = set([_.reqID for _ in self.nodes])
@@ -179,8 +180,8 @@ class HubRoute(object):
         return hubsCanServe
 
     def length(self, distanceMatrix: DistanceMatrix):  # distance length
-        if self.cachedDistance:
-            return self.cachedDistance
+        #if self.cachedDistance:
+            #return self.cachedDistance
 
         # distance between nodes (clients)
         dist = 0
@@ -193,7 +194,7 @@ class HubRoute(object):
             self.nodes[0].reqID, self.nodes[0].locID, self.hubLocID)
         dist += distanceMatrix.reqToHubDist(
             self.nodes[-1].reqID, self.nodes[-1].locID, self.hubLocID)
-        self.cachedDistance = dist
+        #self.cachedDistance = dist
         return dist
 
     def demand(self):
@@ -229,7 +230,7 @@ class DayHubRoutes(object):
     def addRoute(self, route: HubRoute):
         self.routes.append(route)
 
-    def addRouteFromNodes(self, routeID, hubLocID, nodes: List[Node]):
+    def addRouteFromNodes(self, routeID, hubLocID, nodes: List[RequestNode]):
         route = HubRoute(routeID, hubLocID).addNodes(nodes)
         self.routes.append(route)
         self.hubsUsed.add(hubLocID)
@@ -424,7 +425,7 @@ class HubRoutes(object):
                 dayCost = dayHubRoutes.computeCost(
                     vanDistanceCost, vanDayCost, distanceMatrix)
                 cost += dayCost
-                self.costCaching[day] = dayCost
+                #self.costCaching[day] = dayCost
 
         cost += self.nVansRequired() * vanCost
 
@@ -455,6 +456,9 @@ class HubRoutes(object):
 
     def nVansRequired(self):
         return max([len(dayHubRoutes) for day, dayHubRoutes in self.hubRoutes.items()])
+
+    def days(self):
+        return list(self.hubRoutes.keys())
 
     def toDict(self, instance):
         res = {}
@@ -496,7 +500,7 @@ class HubRoutes(object):
     # operators for neighbourhood exploration
 
     def applyOperator(self, day, operatorID):
-        # apply operator from list to specified day
+        # apply intraday operator
 
         dayHubRoute = self.hubRoutes[day]
 
@@ -517,12 +521,44 @@ class HubRoutes(object):
             self.costCaching[day] = None
             self.hubsUsedCaching[day] = None
 
-    def randomMoveNodeDayEarly(self):
-        # move random node to a day earlier to
-        day = random.randint(2, 20)
+    # intraday operators
+    def intraDayRandomMergeRoutes(self, day):
+        dayHubRoute = self.hubRoutes[day]
+        if len(dayHubRoute) > 0:
+            dayHubRoute.randomMergeRoutes()
+            self.costCaching[day] = None
+            self.hubsUsedCaching[day] = None
 
-        while len(self.hubRoutes[day]) < 1:
+    def intraDayRandomNodeInsertion(self, day):
+        dayHubRoute = self.hubRoutes[day]
+        if len(dayHubRoute) > 0:
+            dayHubRoute.randomMergeRoutes()
+            self.costCaching[day] = None
+            self.hubsUsedCaching[day] = None
+
+    def intraDayRandomSectionInsertion(self, day):
+        dayHubRoute = self.hubRoutes[day]
+        if len(dayHubRoute) > 0:
+            dayHubRoute.randomSectionInsertion()
+            self.costCaching[day] = None
+            self.hubsUsedCaching[day] = None
+
+    def intraDayShuffleRoute(self, day):
+        dayHubRoute = self.hubRoutes[day]
+        if len(dayHubRoute) > 0:
+            dayHubRoute.shuffleRoute()
+            self.costCaching[day] = None
+            self.hubsUsedCaching[day] = None
+
+    # Multiday operators
+
+    def randomMoveNodeDayEarly(self, day=None):
+        # move random node to a day earlier to
+        if day == None:
             day = random.randint(2, 20)
+
+            while len(self.hubRoutes[day]) < 1:
+                day = random.randint(2, 20)
 
         r1 = random.choice(self.hubRoutes[day].routes)
 
@@ -552,8 +588,7 @@ class HubRoutes(object):
         return self
 
     def randomChooseOtherHub(self, allHubs: set):
-        #transfer all routes of one hub to another hub
-        #TODO: make sure h2 can be any hub not just already used hub
+        # transfer all routes of one hub to another hub
         hubsUsed = self.hubsUsed()
         if len(hubsUsed) > 1:
             h1 = random.choice(list(hubsUsed))
@@ -565,25 +600,372 @@ class HubRoutes(object):
         return self
 
 
-class DepotRoutes(object):
-    def __init__():
-        return
+class HubNode(object):
+    def __init__(self, locID=None, amounts=None, X=None, Y=None):
+        self.locID = locID
+        self.amounts = amounts
+        self.daysDeliveredEarly = 0
+        if amounts is not None:
+            self.demand = sum(amounts)
+        self.X = X
+        self.Y = Y
 
-class solution(object):
+    def __repr__(self):
+        return f"HubNode(locID:{self.locID})"
+
+
+class DepotRoute(object):
+    def __init__(self, routeID):
+        self.nodes: List[HubNode] = []
+        self.routeID = routeID
+        self.depotLocID = 1  # depot is always locID 1
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+
+    def addNode(self, node: HubNode):
+        # add node to end of route
+        self.nodes.append(node)
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+        return self
+
+    def addNodes(self, nodes: List[HubNode]):
+        for node in nodes:
+            self.addNode(node)
+        return self
+
+    def insertNodeAfter(self, i, newNode: HubNode):
+        # insert node after specified index
+        #appendAfterIndex = self._findIndexOfID(reqID)
+        self.nodes.insert(i+1, newNode)
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+        return self
+
+    def insertNodeBefore(self, i, newNode: HubNode):
+        # insert node after specified index
+        #appendBeforeIndex = self._findIndexOfID(reqID)
+        self.nodes.insert(i, newNode)
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+        return self
+
+    def deleteNode(self, node):
+        self.nodes.remove(node)
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+
+    def deleteNodes(self, nodes: List[HubNode]):
+        for node in nodes:
+            self.deleteNode(node)
+        self.cachedDistance = None
+        self.cachedHubCanServe = None
+
+    def swapNodes(self, ind1, ind2):
+        self.nodes[ind1], self.nodes[ind2] = self.nodes[ind2], self.nodes[ind1]
+        self.cachedDistance = None
+        return self
+
+    def _findIndexOfID(self, nodeID):
+        i = 0
+        el = self.nodes[i]
+
+        while el.reqID != nodeID:
+            i += 1
+            el = self.nodes[i]
+
+        return i
+
+    def length(self, distanceMatrix: DistanceMatrix):  # distance length
+        if self.cachedDistance:
+            return self.cachedDistance
+
+        # distance between nodes (hubs)
+        dist = 0
+        for i in range(0, len(self.nodes)-1):
+            dist += distanceMatrix.byLocID(
+                self.nodes[i].locID, self.nodes[i+1].locID)
+
+        # distance from depot to first hub and from last hub to depot
+
+        dist += distanceMatrix.byLocID(
+            self.depotLocID, self.nodes[0].locID)
+        dist += distanceMatrix.byLocID(
+            self.depotLocID, self.nodes[-1].locID)
+
+        #self.cachedDistance = dist
+        return dist
+
+    def demand(self):
+        return sum(_.demand for _ in self.nodes)
+
+    def amounts(self):
+        nProducts = len(self.nodes[0].amounts)
+        res = []
+        for i in range(nProducts):
+            res.append(sum([_.amounts[i] for _ in self.nodes]))
+        return res
+
+    def nProducts(self):
+        return len(self.nodes[0].amounts)
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+    def __repr__(self):
+        return f"DepotRoute: " + " -> ".join([_.__repr__() for _ in self.nodes])
+
+    def __len__(self):  # nodes (except hub)
+        return len(self.nodes)
+
+    def __getitem__(self, i):
+        return self.nodes[i]
+
+
+class DayDepotRoutes(object):
+    def __init__(self):
+        self.routes = []
+
+    def addRoute(self, route: DepotRoute):
+        self.routes.append(route)
+
+    def addRouteFromNodes(self, routeID, hubLocID, nodes: List[HubNode]):
+        route = DepotRoute(routeID, hubLocID).addNodes(nodes)
+        self.routes.append(route)
+        # nodes: [nodeID1, nodeID2, nodeID3, nodeID4]
+
+    def computeCost(self, truckDistanceCost, truckDayCost, distanceMatrix: DistanceMatrix, instance=None):
+        # compute cost of distance and #vans
+        cost = 0
+        for route in self.routes:
+            cost += route.length(distanceMatrix) * truckDistanceCost
+            cost += truckDayCost
+
+        return cost
+
+    def isFeasible(self, truckCapacity, truckMaxDistance, distanceMatrix, instance, verbose=False) -> bool:
+        # check max capacity and maxd istance constraints. None of the operators will remove nodes from the routes so it is assumed that
+        # if all requests are served in the initial solution this will be the case for all derived solutions.
+        notOverCapacity = True
+        notOverDistance = True
+        hubCanServeRequests = True
+        for route in self.routes:
+            if route.demand() > truckCapacity:
+                if verbose:
+                    print(
+                        f"Route with id {route.routeID} has a demand of {route.demand()} > truckCapacity = {truckCapacity}")
+                notOverCapacity = False
+            routeLength = route.length(distanceMatrix)
+
+            if routeLength > truckMaxDistance:
+                if verbose:
+                    print(
+                        f"Route with id {route.routeID} has a length of {routeLength} > truckMaxDistance = {truckMaxDistance}")
+                notOverDistance = False
+        feasible = notOverCapacity and notOverDistance and hubCanServeRequests
+        return feasible
+
+    def __repr__(self):
+        res = ""
+        for route in self.routes:
+            res += route.__repr__() + "\n"
+        return res
+
+    def __len__(self):
+        return len(self.routes)
+
+
+class DepotRoutes(object):
+    def __init__(self):
+        self.depotRoutes = {}
+        self.costCaching = {}
+
+    def addDayDepotRoutes(self, day, dayDepotRoutes: DayDepotRoutes):
+        self.depotRoutes[day] = dayDepotRoutes
+        self.costCaching[day] = None
+
+    def isFeasible(self, truckCapacity, truckMaxDistance, dm, instance, verbose=False):
+        for day, dayDepotRoutes in self.depotRoutes.items():
+            if not dayDepotRoutes.isFeasible(truckCapacity, truckMaxDistance, dm, instance, verbose):
+                return False
+        return True
+
+    def computeCost(self, truckDistanceCost, truckDayCost, truckCost, distanceMatrix: DistanceMatrix, instance=None):
+        cost = 0
+
+        for day, dayDepotRoutes in self.depotRoutes.items():
+            if self.costCaching[day]:
+                cost += self.costCaching[day]
+            else:
+                dayCost = dayDepotRoutes.computeCost(
+                    truckDistanceCost, truckDayCost, distanceMatrix)
+                cost += dayCost
+                #self.costCaching[day] = dayCost #turned off caching for now
+
+        cost += self.nTrucksRequired() * truckCost
+        return cost
+
+    def nTrucksRequired(self):
+        return max([len(dayDepotRoutes) for day, dayDepotRoutes in self.depotRoutes.items()])
+
+    def days(self):
+        return list(self.depotRoutes.keys())
+
+    def toDict(self, instance):
+        res = {}
+        depot = instance.Locations[0]
+        depotNode = {'X': depot.X, 'Y': depot.Y, 'locID': depot.ID}
+        for day, dayDepotRoutes in self.depotRoutes.items():
+            dayres = {}
+            i = 0
+            for route in dayDepotRoutes.routes:
+                dayres[i] = [depotNode] + [{'X': n.X, 'Y': n.Y, 'demand': n.demand,'amounts': n.amounts, 'locID': n.locID} for n in route.nodes] + [depotNode]
+                i += 1
+            res[day] = dayres
+        return res
+
+
+    def __repr__(self):
+        res = ""
+        for day, data in self.depotRoutes.items():
+            res += "-"*10 + f"day {day}" + "-"*10 + "\n"
+            res += data.__repr__() + "\n"
+        return res
+
+    def __getitem__(self, i):
+        return self.depotRoutes[i]
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+
+class Solution(object):
     def __init__(self, hubRoutes: HubRoutes, depotRoutes: DepotRoutes):
         self.depotRoutes = depotRoutes
         self.hubRoutes = hubRoutes
-        self.depotRecomputeNecessary = False
-    
-    def computeCost(self, instance, hubCost=True, depotCost=True):
-        raise NotImplementedError
-    
-    def isFeasible(self):
-        raise NotImplementedError
 
-    def computeDepotSolution(self):
-        #recompute depot solution when infeasible because hubsolution has been 
-        raise NotImplementedError
-    
+        # this will keep track of which days a truckroute recompute is necessary (after operator is applied to hub on that day)
+        self.depotRecomputeNecessary = {day: False for day in hubRoutes.days()}
+
+    def computeCost(self, instance: InstanceCO22, hubCost=True, depotCost=True, distanceMatrix=None, useHubOpeningCost=None):
+        # compute solution cost
+        cost = 0
+        if hubCost:
+            cost += self.hubRoutes.computeCost(
+                instance.VanDistanceCost, vanDayCost=instance.VanDayCost, vanCost=instance.VanCost, deliverEarlyPenalty=instance.deliverEarlyPenalty, distanceMatrix=distanceMatrix,
+                useHubOpeningCost=useHubOpeningCost, instance=instance)
+
+        if depotCost:
+            cost += self.depotRoutes.computeCost(
+                truckDistanceCost=instance.TruckDistanceCost, truckDayCost=instance.TruckDayCost, truckCost=instance.TruckCost, distanceMatrix=distanceMatrix, instance=instance)
+               
+
+        return cost
+
+    def isFeasible(self, instance: InstanceCO22, distanceMatrix, useCheckHubCanServe=None, hub=True, depot=True):
+        hubFeasible = True
+        depotFeasible = True
+        if hub:
+            hubFeasible = self.hubRoutes.isFeasible(
+                VanCapacity=instance.VanCapacity, VanMaxDistance=instance.VanMaxDistance, dm=distanceMatrix, instance=instance, useCheckHubCanServe=useCheckHubCanServe)
+            
+        if depot:
+            depotFeasible = self.depotRoutes.isFeasible(
+                truckCapacity=instance.TruckCapacity, truckMaxDistance=instance.TruckMaxDistance, dm=distanceMatrix, instance=instance)
+        solutionFeasible = hubFeasible and depotFeasible
+        return solutionFeasible
+
+    def recomputeNecessary(self):
+        return any([v for d, v in self.depotRecomputeNecessary.items()])
+
+    def computeDepotSolution(self, instance: InstanceCO22):
+        # recompute depot solution when infeasible because hubsolution has been changed
+        redo = [d for d, v in self.depotRecomputeNecessary.items() if v is True]
+        if len(redo) > 0:
+            self.depotRoutes = initialSolutions.solveDepotDCCached(instance, self.hubRoutes, cache=self.depotRoutes, redo=redo)
+        
+        for day in redo:    #reset costCaching of depotRoutes for recomputed days
+            self.depotRoutes.costCaching[day] = None
+
+        self.depotRecomputeNecessary = {day: False for day, _ in self.depotRecomputeNecessary.items()} #reset all
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+    def toDict(self, instance):
+        hubRoutesDict = self.hubRoutes.toDict(instance)
+        depotRoutesDict = self.depotRoutes.toDict(instance)
+        return {'depotRoutes': depotRoutesDict, 'hubRoutes': hubRoutesDict}
+
+    def toStr(self, instance):
+        solutionDict = self.toDict(instance)
+        solutionStr = self.solutionToStr(instance, solutionDict)
+        return solutionStr
+
+    ## HubRoute operators
+    # intraday operators
+    def hubIntraDayRandomMergeRoutes(self, day):
+        self.hubRoutes.intraDayRandomMergeRoutes(day)
+        self.depotRecomputeNecessary[day] = True
+
+    def hubIntraDayRandomNodeInsertion(self, day):
+        self.hubRoutes.intraDayRandomNodeInsertion(day)
+        self.depotRecomputeNecessary[day] = True
+
+    def hubIntraDayRandomSectionInsertion(self, day):
+        self.hubRoutes.intraDayRandomSectionInsertion(day)
+        self.depotRecomputeNecessary[day] = True
+        
+    def hubIntraDayShuffleRoute(self, day):
+        self.hubRoutes.intraDayShuffleRoute(day) 
+        
+    # Multiday operators
+    def hubRandomMoveNodeDayEarly(self):
+        day = random.randint(2, 20)
+        while len(self.hubRoutes.hubRoutes[day]) < 1:
+            day = random.randint(2, 20)
+
+        self.hubRoutes.randomMoveNodeDayEarly(day=day)
+        self.depotRecomputeNecessary[day-1] = True
+        self.depotRecomputeNecessary[day-1] = True
 
 
+    def hubRandomChooseOtherHub(self, allHubs: set):
+        self.hubRoutes.randomChooseOtherHub(allHubs=allHubs)
+        self.depotRecomputeNecessary = {day: True for day, _ in self.depotRecomputeNecessary.items()} #reset all
+
+
+    ##Write solutiondict to solution string format
+
+    def solutionToStr(self, instance: InstanceCO22, res: dict):
+        resultString = "DATASET = CO2022_11 \n \n"
+        for day in range(1, instance.Days+1):
+            resultString += f"DAY = {day} \n"
+
+            truckString = ""
+            if day in res['depotRoutes'].keys():
+                nTrucks = len(res['depotRoutes'][day])
+                for routeID, truckRoute in res['depotRoutes'][day].items():
+                    truckString += f"{routeID} "
+                    for i, hubData in enumerate(truckRoute[1:-1]):
+                        amountPerProduct = hubData['amounts']
+                        truckString += f"H{hubData['locID'] - 1} {','.join([str(_) for _ in amountPerProduct])} "
+                    truckString += "\n"
+            else:
+                nTrucks = 0
+
+            resultString += f"NUMBER_OF_TRUCKS = {nTrucks} \n"
+            resultString += truckString
+
+            nVans = 0
+            i = 0
+            vanString = ""
+            for hubLocID in res['hubRoutes'][day].keys():
+                for _, route in res['hubRoutes'][day][hubLocID]['routes'].items():
+                    i += 1
+                    reqIds = [_['reqID'] for _ in route['route'][1:-1]]
+                    vanString += f"{i} H{hubLocID-1} {' '.join([str(_) for _ in reqIds])} \n"
+                nVans += len(res['hubRoutes'][day][hubLocID]['routes'])
+            resultString += f"NUMBER_OF_VANS = {nVans} \n"
+            resultString += vanString + "\n"
+        return resultString
