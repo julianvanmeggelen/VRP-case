@@ -122,8 +122,6 @@ class randomLocalSearch(object):
 
         return self.bestState, self.costs
 
-
-
 ##
 #   EXPERIMENT Tree traversal search
 ##
@@ -350,7 +348,6 @@ class EvolutionarySearchOld(object):
         self._log(f"Finished search on branch starting at initialCost {self.initialStateCost} finishing at {childBestStateCost}")
         return childBestState, childBestStateCost
 
-
 class EvolutionarySearch(object):
     #evolutionary search on HubRoutes
     def __init__(self, instance: InstanceCO22, initialState: HubRoutes, generationSize, candidateSize, nGenerations):
@@ -499,7 +496,6 @@ class EvolutionarySearch(object):
         elapsedTime = time.time() - startTime
         print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
         return self.bestState, self.bestStateCost
-
 
 class EvolutionarySearchBothEchelons(object):
     #evolutionarySearch on Solution
@@ -676,6 +672,8 @@ class EvolutionarySearchBothEchelons(object):
             print(f"Generation {i} - Size: {len(self.generations[-1])} bestCost: {self.bestStateCost} generationCostVariance: {np.std(self.allCosts[-1]):.2f} elapsed: {elapsedTime:.2f}")
         elapsedTime = time.time() - startTime
         print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
+
+        self.bestState.computeDepotSolution(instance=self.instance)
         return self.bestState, self.bestStateCost
     
 
