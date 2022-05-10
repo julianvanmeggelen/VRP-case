@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.CRITICAL)
 #       -d: savedirectory
 ##
 
-algorithms = ['algorithm1_1', 'algorithm1_2', 'algorithm2_greedy02']
+algorithms = ['algorithm1_1', 'algorithm1_2', 'algorithm2_greedy02', 'evolutionarySearch']
 instanceNr = [i for i in range(1, 21)]
 
 
@@ -58,7 +58,7 @@ def solveBatch(dir, alg):
     spec.loader.exec_module(algModule)
 
     print(dir.strip("./") in os.listdir())
-    if dir.strip("./") in os.listdir():
+    if dir.strip("./") in os.listdir("./solutions"):
         print("Warning:: Directory already exists. Overwrite?")
         if input('[y/n] :') == 'n':
             return
@@ -68,9 +68,9 @@ def solveBatch(dir, alg):
         print("-" * 50)
         print(i)
         instance = loadInstance(i)
-        blockPrint()
-        savedPath = algModule.solveAndSave(instance, dir, i)
-        enablePrint()
+        #blockPrint()
+        savedPath = "./solutions" + algModule.solveAndSave(instance, dir, i)
+        #enablePrint()
         DoWork(dummyArgs(instancePath(i), savedPath))
 
 
@@ -78,8 +78,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Batch search')
     parser.add_argument('--alg', '-a', metavar='ALGO_NAME',
                         required=True, help='The algorithm name')
-    parser.add_argument('--instancenr', '-i', metavar='INSTANCE_FILE',
-                        required=True, help='The instance file')
+    parser.add_argument('--instancenrbegin', '-ib', metavar='INSTANCE_RANGE_BEGIN',
+                        required=True, help='The first instance nr')
+    parser.add_argument('--instancenrend', '-ie', metavar='INSTANCE_RANGE_END',
+                        required=True, help='The last instance nr')
     parser.add_argument('--savedir', '-d',
                         metavar='SAVE_PATH', help='The save location')
     args = parser.parse_args()
@@ -90,7 +92,7 @@ if __name__ == "__main__":
 
     # loadAlg(algName)
     #instance = loadInstance(int(args.instancenr))
-    instanceNr = [i for i in range(1, int(args.instancenr)+1)]
-    print("Solving for up untill ", args.instancenr)
+    instanceNr = [i for i in range(int(args.instancenrbegin), int(args.instancenrend)+1)]
+    print("Solving for", args.instancenrbegin ," up untill ", args.instancenrend)
     savedir = args.savedir
     solveBatch(savedir, algName)
