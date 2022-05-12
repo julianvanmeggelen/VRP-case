@@ -129,35 +129,6 @@ def solveHubVRP(instance: InstanceCO22, hubLocID: int, requests: list) -> dict:
     return res
 
 
-def createNxDepot(instance: InstanceCO22, dayRoutes: dict) -> nx.DiGraph:
-    G = nx.DiGraph()
-    # add hubs
-    for (day, hubLocID), hubData in dayRoutes.items():
-        G.add_node(f"{hubLocID}.1", locID=hubLocID, demand=0, amounts=0,
-                   X=instance.Locations[hubLocID-1].X, Y=instance.Locations[hubLocID-1].Y)
-
-    for (day, hubLocID), hubData in dayRoutes.items():
-        i = 1
-        nodeID = f"{hubLocID}.{i}"
-        while nodeID in G.nodes and G.nodes[nodeID]['demand'] + hubData['demand'] > instance.TruckCapacity:
-            i += 1
-            nodeID = f"{hubLocID}.{i}"
-        if nodeID not in G.nodes:
-            G.add_node(nodeID, locID=hubLocID, demand=0, amounts=0,
-                       X=instance.Locations[hubLocID-1].X, Y=instance.Locations[hubLocID-1].Y)
-
-        G.nodes[nodeID]['amounts'] = list(
-            np.array(G.nodes[nodeID]['amounts']) + np.array(hubData['amounts']))
-        G.nodes[nodeID]['demand'] = G.nodes[nodeID]['demand']+hubData['demand']
-
-    G.add_node("Source", locID=1,
-               X=instance.Locations[0].X, Y=instance.Locations[0].Y)
-    G.add_node("Sink", locID=1,
-               X=instance.Locations[0].X, Y=instance.Locations[0].Y)
-
-    G = addAllEdges(G)
-    return G
-
 def parseToHubroutes(res):
     i = 0
     hubRoutesObject = HubRoutes()
@@ -210,6 +181,35 @@ def solveHub(instance: InstanceCO22) -> HubRoutes:
 #####
 ## Initial truck routes using dMin heuristic
 #####
+
+def createNxDepot(instance: InstanceCO22, dayRoutes: dict) -> nx.DiGraph:
+    G = nx.DiGraph()
+    # add hubs
+    for (day, hubLocID), hubData in dayRoutes.items():
+        G.add_node(f"{hubLocID}.1", locID=hubLocID, demand=0, amounts=0,
+                   X=instance.Locations[hubLocID-1].X, Y=instance.Locations[hubLocID-1].Y)
+
+    for (day, hubLocID), hubData in dayRoutes.items():
+        i = 1
+        nodeID = f"{hubLocID}.{i}"
+        while nodeID in G.nodes and G.nodes[nodeID]['demand'] + hubData['demand'] > instance.TruckCapacity:
+            i += 1
+            nodeID = f"{hubLocID}.{i}"
+        if nodeID not in G.nodes:
+            G.add_node(nodeID, locID=hubLocID, demand=0, amounts=0,
+                       X=instance.Locations[hubLocID-1].X, Y=instance.Locations[hubLocID-1].Y)
+
+        G.nodes[nodeID]['amounts'] = list(
+            np.array(G.nodes[nodeID]['amounts']) + np.array(hubData['amounts']))
+        G.nodes[nodeID]['demand'] = G.nodes[nodeID]['demand']+hubData['demand']
+
+    G.add_node("Source", locID=1,
+               X=instance.Locations[0].X, Y=instance.Locations[0].Y)
+    G.add_node("Sink", locID=1,
+               X=instance.Locations[0].X, Y=instance.Locations[0].Y)
+
+    G = addAllEdges(G)
+    return G
 
 def solveDepotVRP(instance: InstanceCO22, dayRoutes: dict) -> dict:
     # for solving per day

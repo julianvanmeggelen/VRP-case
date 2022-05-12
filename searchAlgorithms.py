@@ -604,7 +604,12 @@ class EvolutionarySearchBothEchelons(object):
                 res = Parallel(n_jobs=-1)(delayed(fun)(nb) for nb in feasibleNeighbours)
             else:
                 for nb in feasibleNeighbours:   #recompute depotroutes if necessary
-                    nb.computeDepotSolution(instance=self.instance)
+                    try:
+                        nb.computeDepotSolution(instance=self.instance)
+                    except Exception as e:
+                        print(e)
+                        feasibleNeighbours.remove(nb)
+
         return feasibleNeighbours
 
 
