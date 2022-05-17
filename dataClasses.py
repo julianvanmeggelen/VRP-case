@@ -878,11 +878,11 @@ class Solution(object):
     def recomputeNecessary(self):
         return any([v for d, v in self.depotRecomputeNecessary.items()])
 
-    def computeDepotSolution(self, instance: InstanceCO22):
+    def computeDepotSolution(self, instance: InstanceCO22, useDMin = True):
         # recompute depot solution when infeasible because hubsolution has been changed
         redo = [d for d, v in self.depotRecomputeNecessary.items() if v is True]
         if len(redo) > 0:
-            self.depotRoutes = initialSolutions.solveDepotDCCached(instance, self.hubRoutes, cache=self.depotRoutes, redo=redo)
+            self.depotRoutes = initialSolutions.solveDepotDCCached(instance, self.hubRoutes, cache=self.depotRoutes, redo=redo, useDMin=useDMin)
         
         for day in redo:    #reset costCaching of depotRoutes for recomputed days
             self.depotRoutes.costCaching[day] = None

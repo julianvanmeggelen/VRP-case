@@ -600,12 +600,12 @@ class EvolutionarySearchBothEchelons(object):
     def recomputeDepotRoutes(self, feasibleNeighbours):
         if self.recomputeDepotRoute:
             if self.parallel:
-                fun = lambda nb: nb.compcomputeDepotSolution(self.instance)
+                fun = lambda nb: nb.compcomputeDepotSolution(self.instance, useDMin = self.useDMIn)
                 res = Parallel(n_jobs=-1)(delayed(fun)(nb) for nb in feasibleNeighbours)
             else:
                 for nb in feasibleNeighbours:   #recompute depotroutes if necessary
                     try:
-                        nb.computeDepotSolution(instance=self.instance)
+                        nb.computeDepotSolution(instance=self.instance, useDMin = self.useDMin)
                     except Exception as e:
                         print(e)
                         feasibleNeighbours.remove(nb)
@@ -644,15 +644,16 @@ class EvolutionarySearchBothEchelons(object):
             self.costsInitialised = True
         
 
-    def run(self, parallel = True, earlyStopping: Callable[[List[float]],bool] = lambda costs: False, recomputeDepotRoute = True, useDepotCost = True, nGenerations = None):
+    def run(self, parallel = True, earlyStopping: Callable[[List[float]],bool] = lambda costs: False, recomputeDepotRoute = True, useDepotCost = True, nGenerations = None, useDMin=True):
         self.recomputeDepotRoute = recomputeDepotRoute
         self.useDepotCost = useDepotCost
         self.parallel = parallel
+        self.useDMin = useDMin
 
         self.initCosts()
         
         nGenerations = nGenerations if nGenerations else self.nGenerations
-        print(f"Recomputing depot route: {recomputeDepotRoute}, using depot route cost: {useDepotCost}, initialStateCost: {self.initialStateCost}")
+        print(f"Recomputing depot route: {recomputeDepotRoute}, using depot route cost: {useDepotCost}, initialStateCost: {self.initialStateCost}, useDMin: {self.useDMin}")
         if parallel:
             self.nJobs = cpu_count()
             print(f"Using parallel computing for neighbour generation with nJobs = {self.nJobs}")
@@ -678,7 +679,8 @@ class EvolutionarySearchBothEchelons(object):
         elapsedTime = time.time() - startTime
         print(f"Finished in {elapsedTime:.2f} resulting in cost of: {self.initialStateCost} -> {self.bestStateCost}")
 
-        self.bestState.computeDepotSolution(instance=self.instance)
+        self.bestState.computeDepotSolution(instance=self.instance, useDMin=self.useDMin)
+        self.bestStateCost = self.computeStateCost(self.bestState)
         return self.bestState, self.bestStateCost
     
 
